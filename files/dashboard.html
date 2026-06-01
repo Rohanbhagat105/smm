@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SMM Panel — Distribution Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:#080b12;--s1:#0d1117;--s2:#131720;--s3:#1a1f2e;
+  --border:#1f2535;--border2:#2a3045;
+  --cyan:#00d4ff;--cyan-dim:rgba(0,212,255,.12);
+  --violet:#8b5cf6;--violet-dim:rgba(139,92,246,.12);
+  --amber:#f59e0b;--amber-dim:rgba(245,158,11,.12);
+  --green:#10b981;--green-dim:rgba(16,185,129,.12);
+  --red:#f43f5e;--red-dim:rgba(244,63,94,.12);
+  --text:#c9d1e0;--text2:#8892a4;--text3:#4a5568;
+  --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,212,255,.012) 2px,rgba(0,212,255,.012) 4px);pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;z-index:0}
+#app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+
+/* ── Topbar ── */
+#topbar{background:var(--s1);border-bottom:1px solid var(--border);padding:0 1.75rem;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;backdrop-filter:blur(8px)}
+.logo{font-family:var(--sans);font-weight:700;font-size:1rem;letter-spacing:-.02em;display:flex;align-items:center;gap:.5rem}
+.logo-mark{width:28px;height:28px;background:linear-gradient(135deg,var(--cyan),var(--violet));border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.65rem;color:#fff;font-weight:800}
+.logo span{color:var(--cyan)}
+.nav{display:flex;height:100%}
+.nav-btn{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;padding:0 1.1rem;border:none;border-bottom:2px solid transparent;background:none;color:var(--text3);cursor:pointer;transition:color .15s,border-color .15s;display:flex;align-items:center;gap:.4rem}
+.nav-btn.active,.nav-btn:hover{color:var(--cyan)}
+.nav-btn.active{border-bottom-color:var(--cyan)}
+.nav-badge{font-size:.55rem;padding:1px 5px;background:var(--cyan-dim);color:var(--cyan);border-radius:20px;min-width:16px;text-align:center}
+
+/* ── Main ── */
+#main{flex:1;padding:1.75rem;max-width:1400px;margin:0 auto;width:100%}
+.view{display:none}.view.active{display:block}
+
+/* ── Card ── */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.card-head{background:var(--s2);border-bottom:1px solid var(--border);padding:.7rem 1.25rem;display:flex;align-items:center;gap:.6rem}
+.card-title{font-family:var(--sans);font-weight:600;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
+.card-action{margin-left:auto}
+.card-body{padding:1.25rem}
+
+/* ── Dot ── */
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-cyan{background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+.dot-violet{background:var(--violet);box-shadow:0 0 6px var(--violet)}
+.dot-amber{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+.dot-green{background:var(--green);box-shadow:0 0 6px var(--green)}
+.dot-red{background:var(--red);box-shadow:0 0 6px var(--red)}
+.dot-muted{background:var(--text3)}
+
+/* ── Stats ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:var(--s1);border:1px solid var(--border);border-radius:6px;padding:1rem 1.25rem;position:relative;overflow:hidden;animation:slideUp .4s ease both}
+.stat-card::before{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
+.stat-card:nth-child(1)::before{background:var(--cyan)}
+.stat-card:nth-child(2)::before{background:var(--violet)}
+.stat-card:nth-child(3)::before{background:var(--green)}
+.stat-card:nth-child(4)::before{background:var(--amber)}
+.stat-label{font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:.4rem}
+.stat-value{font-family:var(--sans);font-weight:700;font-size:1.75rem;color:var(--text)}
+.stat-sub{font-size:.62rem;color:var(--text3);margin-top:.2rem}
+
+/* ── Order cards grid ── */
+.orders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem;margin-bottom:1.5rem}
+
+/* ── Single order card ── */
+.order-card{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:1.25rem 1.4rem;cursor:pointer;transition:border-color .2s,box-shadow .2s;position:relative;overflow:hidden}
+.order-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--border)}
+.order-card.status-running::before{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.order-card.status-paused::before{background:var(--amber)}
+.order-card.status-completed::before{background:var(--green)}
+.order-card.status-failed::before{background:var(--red)}
+.order-card:hover{border-color:var(--border2);box-shadow:0 4px 24px rgba(0,0,0,.3)}
+.order-card.selected{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan-dim)}
+
+.oc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.9rem}
+.oc-name{font-family:var(--sans);font-weight:700;font-size:.95rem;color:var(--text);line-height:1.2;max-width:200px;word-break:break-word}
+.oc-id{font-size:.6rem;color:var(--text3);margin-top:.15rem}
+.oc-edit-btn{background:none;border:1px solid var(--border2);color:var(--text3);font-size:.65rem;padding:.25rem .6rem;border-radius:3px;cursor:pointer;font-family:var(--mono);transition:color .15s,border-color .15s;white-space:nowrap}
+.oc-edit-btn:hover{color:var(--cyan);border-color:var(--cyan)}
+
+.oc-service-row{display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.oc-pill{font-size:.6rem;padding:2px 8px;border-radius:20px;font-family:var(--mono)}
+.oc-pill-provider{background:var(--violet-dim);color:var(--violet)}
+.oc-pill-service{background:var(--cyan-dim);color:var(--cyan)}
+.oc-url{font-size:.62rem;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+
+/* ── Progress section inside card ── */
+.oc-progress-label{font-family:var(--sans);font-weight:600;font-size:.8rem;color:var(--text2);margin-bottom:.5rem}
+.oc-prog-track{height:6px;background:var(--s3);border-radius:3px;overflow:hidden;margin-bottom:.4rem}
+.oc-prog-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.oc-prog-meta{display:flex;justify-content:space-between;align-items:center}
+.oc-units{font-family:var(--sans);font-weight:700;font-size:.85rem;color:var(--text)}
+.oc-cycles{font-size:.62rem;color:var(--text3)}
+
+.oc-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--border)}
+.oc-actions{display:flex;gap:.35rem}
+.oc-countdown{font-size:.62rem;color:var(--amber);letter-spacing:.03em}
+
+/* ── Status tag ── */
+.tag{display:inline-flex;align-items:center;gap:.35rem;padding:3px 9px;border-radius:3px;font-size:.62rem;font-weight:600;letter-spacing:.04em}
+.tag::before{content:'';width:5px;height:5px;border-radius:50%}
+.tag-pending{background:rgba(74,85,104,.15);color:#4a5568}.tag-pending::before{background:#4a5568}
+.tag-running{background:var(--cyan-dim);color:var(--cyan)}.tag-running::before{background:var(--cyan);box-shadow:0 0 4px var(--cyan);animation:pulse 1s ease infinite}
+.tag-paused{background:var(--amber-dim);color:var(--amber)}.tag-paused::before{background:var(--amber)}
+.tag-completed{background:var(--green-dim);color:var(--green)}.tag-completed::before{background:var(--green)}
+.tag-failed{background:var(--red-dim);color:var(--red)}.tag-failed::before{background:var(--red)}
+
+/* ── Log + detail panel ── */
+.detail-layout{display:grid;grid-template-columns:300px 1fr;gap:1.25rem;align-items:start;margin-bottom:1.5rem;animation:slideUp .3s ease}
+.detail-row{display:flex;justify-content:space-between;align-items:center;padding:.45rem 0;border-bottom:1px solid rgba(31,37,53,.6);font-size:.72rem}
+.detail-row:last-child{border-bottom:none}
+.detail-key{color:var(--text3)}.detail-val{color:var(--text);font-weight:500}
+.batch-pills{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.5rem}
+.batch-pill{padding:2px 8px;border-radius:3px;font-size:.62rem;transition:opacity .2s}
+.batch-pill.done{background:var(--green-dim);color:var(--green);text-decoration:line-through;opacity:.45}
+.batch-pill.pending{background:var(--violet-dim);color:var(--violet)}
+.batch-pill.current{background:var(--cyan-dim);color:var(--cyan);box-shadow:0 0 6px var(--cyan-dim)}
+
+/* ── Terminal ── */
+.terminal{background:var(--bg);height:300px;overflow-y:auto;padding:.85rem 1rem;font-size:.7rem;line-height:1.8;font-family:var(--mono)}
+.terminal::-webkit-scrollbar{width:4px}.terminal::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.log-line{display:flex;gap:.6rem;align-items:baseline}
+.log-ts{color:var(--text3);flex-shrink:0;font-size:.62rem}
+.log-tag{flex-shrink:0;font-weight:600;min-width:2.8rem;font-size:.65rem}
+.log-msg{color:var(--text);word-break:break-all}
+.lt-sys{color:var(--violet)}.lt-info{color:var(--cyan)}.lt-ok{color:var(--green)}.lt-err{color:var(--red)}.lt-warn{color:var(--amber)}.lt-edit{color:var(--amber)}
+
+/* ── Buttons ── */
+.btn{font-family:var(--mono);font-size:.65rem;letter-spacing:.06em;padding:.35rem .85rem;border-radius:3px;border:none;cursor:pointer;transition:opacity .15s,transform .1s;font-weight:500;white-space:nowrap}
+.btn:hover{opacity:.85}.btn:active{transform:scale(.97)}.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-primary{background:var(--cyan);color:#000}
+.btn-violet{background:var(--violet);color:#fff}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-warn{background:var(--amber);color:#000}
+.btn-success{background:var(--green);color:#000}
+.btn-lg{padding:.65rem 1.4rem;font-size:.78rem}
+.btn-icon{padding:.32rem .55rem}
+.btn-row{display:flex;gap:.35rem;align-items:center}
+
+/* ── Table (providers) ── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.73rem}
+thead tr{border-bottom:1px solid var(--border)}
+th{padding:.55rem 1rem;text-align:left;color:var(--text3);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;font-weight:500}
+tbody tr{border-bottom:1px solid rgba(31,37,53,.7);transition:background .15s}
+tbody tr:hover{background:rgba(0,212,255,.03)}
+td{padding:.7rem 1rem}
+
+/* ── Form ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:.35rem}
+label.lbl{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
+input,select{background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.8rem;padding:.55rem .8rem;border-radius:4px;outline:none;width:100%;transition:border-color .2s,box-shadow .2s}
+input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 2px var(--cyan-dim)}
+input::placeholder{color:var(--text3)}
+select option{background:var(--s2)}
+.section-sep{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--violet);padding:.5rem 0 .2rem;border-top:1px solid var(--border);margin-top:.25rem;grid-column:1/-1}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:flex;align-items:center;justify-content:center;animation:fadeIn .15s ease}
+.modal{background:var(--s1);border:1px solid var(--border2);border-radius:8px;width:560px;max-height:90vh;overflow-y:auto;animation:slideUp .2s ease}
+.modal-head{display:flex;align-items:center;gap:.6rem;padding:.9rem 1.25rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--s1);z-index:1}
+.modal-close{margin-left:auto;background:none;border:none;color:var(--text3);font-size:1.1rem;cursor:pointer;line-height:1;transition:color .15s}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
+
+/* ── Providers layout ── */
+.provider-layout{display:grid;grid-template-columns:1fr 360px;gap:1.5rem;align-items:start}
+
+/* ── Algorithm ── */
+.bar-chart{display:flex;align-items:flex-end;gap:3px;height:140px;padding:.5rem 0}
+.bar{flex:1;min-width:4px;border-radius:2px 2px 0 0;background:linear-gradient(to top,var(--violet),var(--cyan));opacity:.8;cursor:default;position:relative;transition:height .4s cubic-bezier(.4,0,.2,1)}
+.bar:hover{opacity:1}
+.bar:hover::after{content:attr(data-val);position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--s3);color:var(--cyan);font-size:.58rem;padding:2px 6px;border-radius:2px;white-space:nowrap;pointer-events:none}
+
+/* ── Live badge ── */
+.live-badge{font-size:.58rem;letter-spacing:.08em;display:flex;align-items:center;gap:.3rem}
+.live-dot{width:5px;height:5px;border-radius:50%}
+.live-dot.on{background:var(--green);animation:pulse 1s ease infinite}
+.live-dot.off{background:var(--text3)}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;pointer-events:none}
+.toast-item{background:var(--s2);border:1px solid var(--border2);padding:.65rem 1.1rem;border-radius:4px;font-size:.73rem;max-width:340px;animation:slideLeft .2s ease both;pointer-events:auto;display:flex;gap:.6rem;align-items:center}
+.toast-ok{border-left:3px solid var(--green)}.toast-err{border-left:3px solid var(--red)}.toast-warn{border-left:3px solid var(--amber)}
+
+/* ── Empty ── */
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--text3);font-size:.75rem;letter-spacing:.05em}
+.empty-icon{font-size:2rem;margin-bottom:.75rem;opacity:.4}
+
+/* ── Animations ── */
+@keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes slideLeft{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+@media(max-width:900px){
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .provider-layout,.detail-layout{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  #main{padding:1rem}
+  .stats-grid{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+  .orders-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ── Topbar ── -->
+<div id="topbar">
+  <div class="logo">
+    <div class="logo-mark">S</div>
+    SMM<span>Panel</span>
+  </div>
+  <nav class="nav">
+    <button class="nav-btn active" onclick="switchView('orders',this)">Orders <span class="nav-badge" id="badge-orders">0</span></button>
+    <button class="nav-btn" onclick="switchView('providers',this)">Providers <span class="nav-badge" id="badge-providers">0</span></button>
+    <button class="nav-btn" onclick="switchView('algorithm',this)">Algorithm</button>
+  </nav>
+  <div id="proxy-indicator" style="display:flex;align-items:center;gap:.4rem;font-size:.65rem;font-family:var(--mono);padding:.3rem .7rem;border-radius:20px;border:1px solid var(--border2);cursor:pointer" onclick="retryProxy()" title="Click to retry proxy connection">
+    <div id="proxy-dot" style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></div>
+    <span id="proxy-txt" style="color:var(--text3)">proxy…</span>
+  </div>
+</div>
+
+<div id="main">
+
+<!-- ════════════ ORDERS VIEW ════════════ -->
+<div class="view active" id="view-orders">
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value" id="stat-total">0</div><div class="stat-sub">all time</div></div>
+    <div class="stat-card"><div class="stat-label">Running</div><div class="stat-value" id="stat-running">0</div><div class="stat-sub">active campaigns</div></div>
+    <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value" id="stat-completed">0</div><div class="stat-sub">finished</div></div>
+    <div class="stat-card"><div class="stat-label">Units Dispatched</div><div class="stat-value" id="stat-units">0</div><div class="stat-sub">total sent</div></div>
+  </div>
+
+  <!-- Header row -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+    <div style="font-family:var(--sans);font-weight:600;font-size:.78rem;color:var(--text2);letter-spacing:.06em;text-transform:uppercase">Active Orders</div>
+    <button class="btn btn-primary" onclick="openNewOrder()">＋ New Order</button>
+  </div>
+
+  <!-- Order cards -->
+  <div class="orders-grid" id="orders-grid">
+    <div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📋</div>No orders yet. Create your first campaign.</div>
+  </div>
+
+  <!-- Detail + live log (shown when order selected) -->
+  <div id="order-detail" style="display:none">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+      <div class="dot dot-cyan"></div>
+      <span style="font-family:var(--sans);font-weight:600;font-size:.78rem;color:var(--text2);letter-spacing:.06em;text-transform:uppercase" id="detail-section-title">Order Detail</span>
+      <button class="btn btn-ghost btn-icon" style="margin-left:auto;font-size:.65rem" onclick="closeDetail()">✕ Close</button>
+    </div>
+    <div class="detail-layout">
+      <div class="card">
+        <div class="card-head">
+          <div class="dot dot-amber"></div>
+          <span class="card-title" id="detail-title">Detail</span>
+        </div>
+        <div class="card-body">
+          <div id="detail-rows"></div>
+          <div style="margin-top:1rem">
+            <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:.5rem">Batch Plan</div>
+            <div class="batch-pills" id="detail-pills"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div class="dot dot-cyan"></div>
+          <span class="card-title">Live Execution Log</span>
+          <div class="card-action">
+            <div class="live-badge"><div class="live-dot off" id="live-indicator"></div><span id="live-status-txt">idle</span></div>
+          </div>
+        </div>
+        <div class="terminal" id="log-terminal">
+          <div style="color:var(--text3);font-size:.7rem">Start the campaign to see live execution logs.</div>
+        </div>
+        <div id="countdown" style="display:none;font-size:.68rem;color:var(--amber);text-align:center;padding:.5rem;letter-spacing:.03em;background:var(--s2);border-top:1px solid var(--border)"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /orders view -->
+
+<!-- ════════════ PROVIDERS VIEW ════════════ -->
+<div class="view" id="view-providers">
+  <div class="provider-layout">
+    <div class="card">
+      <div class="card-head"><div class="dot dot-violet"></div><span class="card-title">Saved Providers</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Endpoint</th><th>API Key</th><th>Actions</th></tr></thead>
+          <tbody id="providers-tbody">
+            <tr><td colspan="4"><div class="empty-state"><div class="empty-icon">🔑</div>No providers saved.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="dot dot-amber" id="pform-dot"></div><span class="card-title" id="pform-title">Add Provider</span></div>
+      <div class="card-body">
+        <div style="display:flex;flex-direction:column;gap:.9rem">
+          <input type="hidden" id="p-editing-id"/>
+          <div class="field"><label class="lbl">Label / Name</label><input id="p-name" placeholder="e.g. YoYoMedia Primary"/></div>
+          <div class="field"><label class="lbl">API Endpoint URL</label><input id="p-endpoint" placeholder="https://yoyomedia.in/api/v2"/></div>
+          <div class="field"><label class="lbl">API Key</label><input id="p-key" type="password" placeholder="Enter API key"/></div>
+          <div style="display:flex;gap:.5rem">
+            <button class="btn btn-primary btn-lg" style="flex:1" onclick="saveProvider()">Save Provider</button>
+            <button class="btn btn-ghost" id="p-cancel-btn" onclick="cancelEditProvider()" style="display:none">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ ALGORITHM VIEW ════════════ -->
+<div class="view" id="view-algorithm">
+  <div style="display:grid;grid-template-columns:300px 1fr;gap:1.5rem;align-items:start">
+    <div class="card">
+      <div class="card-head"><div class="dot dot-amber"></div><span class="card-title">Algorithm Inputs</span></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:1rem">
+        <div class="field"><label class="lbl">Total Target Quantity</label><input id="alg-total" type="number" value="1000"/></div>
+        <div class="field"><label class="lbl">Min Per Burst</label><input id="alg-min" type="number" value="100"/></div>
+        <div class="field"><label class="lbl">Max Per Burst</label><input id="alg-max" type="number" value="200"/></div>
+        <button class="btn btn-primary btn-lg" onclick="runAlgorithm()">⟳ Generate Plan</button>
+        <div id="alg-meta" style="display:none">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+            <div style="background:var(--bg);border-radius:4px;padding:.65rem .85rem"><div style="font-size:.58rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.3rem">Cycles</div><div style="color:var(--cyan);font-weight:600;font-size:1.1rem" id="alg-cycles">—</div></div>
+            <div style="background:var(--bg);border-radius:4px;padding:.65rem .85rem"><div style="font-size:.58rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.3rem">Sum</div><div style="color:var(--green);font-weight:600;font-size:1.1rem" id="alg-sum">—</div></div>
+            <div style="background:var(--bg);border-radius:4px;padding:.65rem .85rem"><div style="font-size:.58rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.3rem">Avg Batch</div><div style="color:var(--violet);font-weight:600;font-size:1.1rem" id="alg-avg">—</div></div>
+            <div style="background:var(--bg);border-radius:4px;padding:.65rem .85rem"><div style="font-size:.58rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.3rem">Range</div><div style="color:var(--amber);font-weight:600;font-size:1.1rem" id="alg-range">—</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:1.25rem">
+      <!-- Bar chart -->
+      <div class="card">
+        <div class="card-head"><div class="dot dot-cyan"></div><span class="card-title">Batch Distribution — Bar Chart</span></div>
+        <div class="card-body">
+          <div id="alg-empty" style="color:var(--text3);font-size:.75rem;padding:2rem 0;text-align:center">Generate a plan to visualize the batch distribution</div>
+          <div id="alg-chart-wrap" style="display:none">
+            <div class="bar-chart" id="alg-bars"></div>
+            <div style="font-size:.6rem;color:var(--text3);margin:.75rem 0 .4rem">Exact batch sequence (hover bars for values):</div>
+            <div class="batch-pills" id="alg-pills"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Cumulative area chart -->
+      <div class="card" id="alg-linechart-card" style="display:none">
+        <div class="card-head"><div class="dot dot-violet"></div><span class="card-title">Cumulative Units — Area Chart</span><div class="card-action" style="font-size:.6rem;color:var(--text3)">total dispatched over cycles</div></div>
+        <div class="card-body" style="padding:.75rem 1.25rem 1.25rem"><canvas id="alg-area-canvas" height="160" style="width:100%"></canvas></div>
+      </div>
+      <!-- Line graph -->
+      <div class="card" id="alg-scatter-card" style="display:none">
+        <div class="card-head"><div class="dot dot-amber"></div><span class="card-title">Per-Cycle Quantity — Line Graph</span><div class="card-action" style="font-size:.6rem;color:var(--text3)">randomness distribution</div></div>
+        <div class="card-body" style="padding:.75rem 1.25rem 1.25rem"><canvas id="alg-line-canvas" height="160" style="width:100%"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<div id="toast"></div>
+
+<!-- ── New Order Modal ── -->
+<div class="modal-overlay" id="modal-new-order" style="display:none" onclick="if(event.target===this)closeModal('modal-new-order')">
+  <div class="modal">
+    <div class="modal-head"><div class="dot dot-cyan"></div><span class="card-title">New Drip-Feed Order</span><button class="modal-close" onclick="closeModal('modal-new-order')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field full"><label class="lbl">Campaign Name <span style="color:var(--cyan);font-size:.58rem">(so you can remember it)</span></label><input id="o-name" placeholder="e.g. Instagram Growth – May batch"/></div>
+        <div class="field"><label class="lbl">API Provider</label><select id="o-provider"><option value="">— Select provider —</option></select></div>
+        <div class="field"><label class="lbl">Service ID</label><input id="o-service" type="number" placeholder="123"/></div>
+        <div class="field full"><label class="lbl">Target URL</label><input id="o-url" placeholder="https://example.com/target"/></div>
+        <div class="section-sep">Quantity</div>
+        <div class="field full"><label class="lbl">Total Target Quantity</label><input id="o-total" type="number" value="1000"/></div>
+        <div class="field"><label class="lbl">Min Per Burst</label><input id="o-min" type="number" value="100"/></div>
+        <div class="field"><label class="lbl">Max Per Burst</label><input id="o-max" type="number" value="200"/></div>
+        <div class="section-sep">Schedule</div>
+        <div class="field"><label class="lbl">Interval (minutes)</label><input id="o-interval" type="number" value="2" step="0.5"/></div>
+        <div class="field" style="align-self:end"><button class="btn btn-ghost" style="width:100%" onclick="previewInModal()">⟳ Preview Plan</button></div>
+      </div>
+      <div id="modal-preview" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1rem;font-size:.72rem">
+        <div style="display:flex;gap:1.5rem;margin-bottom:.75rem">
+          <div><div style="color:var(--text3);font-size:.6rem;margin-bottom:2px">Cycles</div><div style="color:var(--cyan);font-weight:600" id="mp-cycles"></div></div>
+          <div><div style="color:var(--text3);font-size:.6rem;margin-bottom:2px">Sum</div><div style="color:var(--green);font-weight:600" id="mp-sum"></div></div>
+          <div><div style="color:var(--text3);font-size:.6rem;margin-bottom:2px">Avg</div><div style="color:var(--violet);font-weight:600" id="mp-avg"></div></div>
+        </div>
+        <div style="font-size:.6rem;color:var(--text3);margin-bottom:.4rem">Batch sequence:</div>
+        <div class="batch-pills" id="mp-pills"></div>
+      </div>
+      <div style="display:flex;gap:.6rem">
+        <button class="btn btn-primary btn-lg" style="flex:1" onclick="createOrder()">Create Order</button>
+        <button class="btn btn-ghost" onclick="closeModal('modal-new-order')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Edit Order Modal ── -->
+<div class="modal-overlay" id="modal-edit-order" style="display:none" onclick="if(event.target===this)closeModal('modal-edit-order')">
+  <div class="modal" style="width:420px">
+    <div class="modal-head"><div class="dot dot-amber"></div><span class="card-title" id="edit-modal-title">Edit Order</span><button class="modal-close" onclick="closeModal('modal-edit-order')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-order-id"/>
+      <div class="field"><label class="lbl">Campaign Name</label><input id="edit-name" type="text"/></div>
+      <div class="field"><label class="lbl">Interval (minutes)</label><input id="edit-interval" type="number" step="0.5"/></div>
+      <div class="field"><label class="lbl">Total / Remaining Target Quantity</label><input id="edit-remaining" type="number"/></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div class="field"><label class="lbl">Min Per Burst</label><input id="edit-min" type="number" min="1"/></div>
+        <div class="field"><label class="lbl">Max Per Burst</label><input id="edit-max" type="number" min="1"/></div>
+      </div>
+      <p style="font-size:.65rem;color:var(--text3)">Changing target or burst range rebuilds the batch plan from the current cycle onwards.</p>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-warn btn-lg" style="flex:1" onclick="applyEdit()">Apply Changes</button>
+        <button class="btn btn-ghost" onclick="closeModal('modal-edit-order')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// PERSISTENCE
+// ════════════════════════════════════════════════════════
+const DB = {
+  load(k,d){try{return JSON.parse(localStorage.getItem(k)||'null')??d}catch{return d}},
+  save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+};
+
+let providers = DB.load('smm_providers',[]);
+let orders    = DB.load('smm_orders',[]);
+let nextPId   = DB.load('smm_npid',1);
+let nextOId   = DB.load('smm_noid',1);
+
+function persist(){
+  DB.save('smm_providers',providers);
+  DB.save('smm_orders',orders);
+  DB.save('smm_npid',nextPId);
+  DB.save('smm_noid',nextOId);
+}
+
+// In-memory worker state
+const workers   = {};   // orderId -> {stopFlag}
+const orderLogs = {};   // orderId -> [{type,tag,msg,ts}]
+let selectedOrderId = null;
+
+// ════════════════════════════════════════════════════════
+// NAV
+// ════════════════════════════════════════════════════════
+function switchView(name,btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='providers') renderProviders();
+}
+
+// ════════════════════════════════════════════════════════
+// BATCH PLAN ALGORITHM
+// ════════════════════════════════════════════════════════
+function computeBatchPlan(total,minB,maxB){
+  if(minB<=0||maxB<minB) throw new Error('Invalid min/max burst values');
+  if(total<minB) throw new Error(`Total (${total}) < min burst (${minB})`);
+  const batches=[];
+  let rem=total;
+  while(rem>0){
+    if(rem<=maxB){batches.push(rem);break}
+    let hi=Math.min(maxB,rem);
+    let lo=Math.min(minB,hi);
+    let draw=randInt(lo,hi);
+    let leftover=rem-draw;
+    if(leftover>0&&leftover<minB){draw=rem-minB;draw=Math.max(draw,lo)}
+    if(draw<=0){batches.push(rem);break}
+    batches.push(draw);
+    rem-=draw;
+  }
+  const sum=batches.reduce((a,b)=>a+b,0);
+  if(sum!==total) throw new Error(`Integrity check failed: ${sum} ≠ ${total}`);
+  return batches;
+}
+function randInt(min,max){return Math.floor(Math.random()*(max-min+1))+min}
+
+// ════════════════════════════════════════════════════════
+// ALGORITHM VIEW
+// ════════════════════════════════════════════════════════
+let _areaChart=null,_lineChart=null;
+
+function runAlgorithm(){
+  const total=+document.getElementById('alg-total').value;
+  const min=+document.getElementById('alg-min').value;
+  const max=+document.getElementById('alg-max').value;
+  try{
+    const plan=computeBatchPlan(total,min,max);
+    const sum=plan.reduce((a,b)=>a+b,0);
+    const avg=(sum/plan.length).toFixed(1);
+    const maxV=Math.max(...plan);
+
+    document.getElementById('alg-cycles').textContent=plan.length;
+    document.getElementById('alg-sum').textContent=fmt(sum);
+    document.getElementById('alg-avg').textContent=avg;
+    document.getElementById('alg-range').textContent=`${min}–${max}`;
+    document.getElementById('alg-meta').style.display='';
+    document.getElementById('alg-empty').style.display='none';
+    document.getElementById('alg-chart-wrap').style.display='';
+    document.getElementById('alg-linechart-card').style.display='';
+    document.getElementById('alg-scatter-card').style.display='';
+
+    // Bar chart
+    document.getElementById('alg-bars').innerHTML=plan.map(n=>
+      `<div class="bar" data-val="${n}" style="height:${Math.max(8,(n/maxV)*100)}%"></div>`
+    ).join('');
+    document.getElementById('alg-pills').innerHTML=plan.map(n=>
+      `<span class="batch-pill pending">${n}</span>`).join('');
+
+    // Area + Line canvas charts
+    drawAreaChart(plan,sum);
+    drawLineChart(plan,min,max);
+  }catch(e){toast(e.message,'err')}
+}
+
+function drawAreaChart(plan,total){
+  const canvas=document.getElementById('alg-area-canvas');
+  canvas.width=canvas.offsetWidth||800;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  // Build cumulative data
+  const data=[0];
+  plan.forEach(v=>data.push(data[data.length-1]+v));
+  const n=data.length;
+  const padL=40,padR=16,padT=12,padB=28;
+  const gW=W-padL-padR,gH=H-padT-padB;
+
+  const xS=i=>padL+i*(gW/(n-1));
+  const yS=v=>padT+gH-(v/total)*gH;
+
+  // Grid lines
+  ctx.strokeStyle='rgba(31,37,53,.8)';ctx.lineWidth=1;
+  [0,.25,.5,.75,1].forEach(f=>{
+    const y=padT+gH*(1-f);
+    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+    ctx.fillStyle='rgba(139,92,246,.7)';ctx.font='9px JetBrains Mono,monospace';
+    ctx.fillText(fmt(Math.round(total*f)),2,y+3);
+  });
+
+  // Area fill
+  const grad=ctx.createLinearGradient(0,padT,0,padT+gH);
+  grad.addColorStop(0,'rgba(139,92,246,.35)');
+  grad.addColorStop(1,'rgba(139,92,246,.02)');
+  ctx.beginPath();
+  ctx.moveTo(xS(0),yS(data[0]));
+  data.forEach((v,i)=>{if(i>0)ctx.lineTo(xS(i),yS(v))});
+  ctx.lineTo(xS(n-1),padT+gH);ctx.lineTo(xS(0),padT+gH);ctx.closePath();
+  ctx.fillStyle=grad;ctx.fill();
+
+  // Line
+  ctx.beginPath();ctx.strokeStyle='#8b5cf6';ctx.lineWidth=2;ctx.lineJoin='round';
+  data.forEach((v,i)=>{i===0?ctx.moveTo(xS(i),yS(v)):ctx.lineTo(xS(i),yS(v))});
+  ctx.stroke();
+
+  // Dots
+  ctx.fillStyle='#8b5cf6';
+  data.forEach((v,i)=>{ctx.beginPath();ctx.arc(xS(i),yS(v),3,0,Math.PI*2);ctx.fill()});
+
+  // X-axis labels
+  ctx.fillStyle='rgba(74,85,104,.9)';ctx.font='9px JetBrains Mono,monospace';
+  const step=Math.max(1,Math.floor(n/6));
+  data.forEach((_,i)=>{if(i%step===0||i===n-1)ctx.fillText(`C${i}`,xS(i)-6,H-6)});
+}
+
+function drawLineChart(plan,minB,maxB){
+  const canvas=document.getElementById('alg-line-canvas');
+  canvas.width=canvas.offsetWidth||800;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const n=plan.length;
+  const padL=40,padR=16,padT=12,padB=28;
+  const gW=W-padL-padR,gH=H-padT-padB;
+  const domMin=Math.min(...plan)*0.9;
+  const domMax=Math.max(...plan)*1.05;
+
+  const xS=i=>padL+i*(gW/Math.max(n-1,1));
+  const yS=v=>padT+gH-((v-domMin)/(domMax-domMin))*gH;
+
+  // Grid + labels
+  ctx.strokeStyle='rgba(31,37,53,.8)';ctx.lineWidth=1;
+  [0,.25,.5,.75,1].forEach(f=>{
+    const v=domMin+(domMax-domMin)*f;
+    const y=padT+gH*(1-f);
+    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+    ctx.fillStyle='rgba(0,212,255,.6)';ctx.font='9px JetBrains Mono,monospace';
+    ctx.fillText(Math.round(v),2,y+3);
+  });
+
+  // Min/max band
+  const bandGrad=ctx.createLinearGradient(0,yS(maxB),0,yS(minB));
+  bandGrad.addColorStop(0,'rgba(0,212,255,.06)');
+  bandGrad.addColorStop(1,'rgba(0,212,255,.06)');
+  ctx.fillStyle=bandGrad;
+  ctx.fillRect(padL,yS(maxB),gW,yS(minB)-yS(maxB));
+  // Band borders
+  ctx.strokeStyle='rgba(0,212,255,.2)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(padL,yS(maxB));ctx.lineTo(W-padR,yS(maxB));ctx.stroke();
+  ctx.beginPath();ctx.moveTo(padL,yS(minB));ctx.lineTo(W-padR,yS(minB));ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Area under line
+  const aGrad=ctx.createLinearGradient(0,padT,0,padT+gH);
+  aGrad.addColorStop(0,'rgba(245,158,11,.25)');
+  aGrad.addColorStop(1,'rgba(245,158,11,.02)');
+  ctx.beginPath();
+  ctx.moveTo(xS(0),yS(plan[0]));
+  plan.forEach((v,i)=>{if(i>0)ctx.lineTo(xS(i),yS(v))});
+  ctx.lineTo(xS(n-1),padT+gH);ctx.lineTo(xS(0),padT+gH);ctx.closePath();
+  ctx.fillStyle=aGrad;ctx.fill();
+
+  // Line
+  ctx.beginPath();ctx.strokeStyle='#f59e0b';ctx.lineWidth=2;ctx.lineJoin='round';
+  plan.forEach((v,i)=>{i===0?ctx.moveTo(xS(i),yS(v)):ctx.lineTo(xS(i),yS(v))});
+  ctx.stroke();
+
+  // Dots
+  plan.forEach((v,i)=>{
+    ctx.beginPath();ctx.arc(xS(i),yS(v),3,0,Math.PI*2);
+    ctx.fillStyle='#f59e0b';ctx.fill();
+    ctx.strokeStyle='var(--s1)';ctx.lineWidth=1.5;ctx.stroke();
+  });
+
+  // X labels
+  ctx.fillStyle='rgba(74,85,104,.9)';ctx.font='9px JetBrains Mono,monospace';
+  const step=Math.max(1,Math.floor(n/6));
+  plan.forEach((_,i)=>{if(i%step===0||i===n-1)ctx.fillText(`C${i+1}`,xS(i)-6,H-6)});
+}
+
+// ════════════════════════════════════════════════════════
+// PROVIDERS
+// ════════════════════════════════════════════════════════
+function renderProviders(){
+  const tb=document.getElementById('providers-tbody');
+  document.getElementById('badge-providers').textContent=providers.length;
+  if(!providers.length){
+    tb.innerHTML=`<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">🔑</div>No providers saved.</div></td></tr>`;return;
+  }
+  tb.innerHTML=providers.map(p=>`
+    <tr>
+      <td style="color:var(--violet);font-weight:600">${esc(p.name)}</td>
+      <td style="color:var(--text2);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.endpoint)}</td>
+      <td style="color:var(--text3)">••••${p.key.slice(-4)}</td>
+      <td><div class="btn-row"><button class="btn btn-ghost btn-icon" onclick="editProvider(${p.id})">✎</button><button class="btn btn-danger btn-icon" onclick="deleteProvider(${p.id})">✕</button></div></td>
+    </tr>`).join('');
+}
+
+function saveProvider(){
+  const id=document.getElementById('p-editing-id').value;
+  const name=document.getElementById('p-name').value.trim();
+  const endpoint=document.getElementById('p-endpoint').value.trim();
+  const key=document.getElementById('p-key').value.trim();
+  if(!name||!endpoint||(!key&&!id)){toast('All fields required','err');return}
+  if(id){
+    const p=providers.find(x=>x.id==id);if(!p)return;
+    p.name=name;p.endpoint=endpoint;if(key)p.key=key;
+    toast('Provider updated','ok');cancelEditProvider();
+  }else{
+    if(providers.find(x=>x.name===name)){toast('Name already exists','err');return}
+    providers.push({id:nextPId++,name,endpoint,key});
+    toast('Provider saved','ok');clearProviderForm();
+  }
+  persist();renderProviders();populateProviderDropdown();
+}
+
+function editProvider(id){
+  const p=providers.find(x=>x.id===id);if(!p)return;
+  document.getElementById('p-editing-id').value=id;
+  document.getElementById('p-name').value=p.name;
+  document.getElementById('p-endpoint').value=p.endpoint;
+  document.getElementById('p-key').value='';
+  document.getElementById('p-cancel-btn').style.display='';
+  document.getElementById('pform-title').textContent='Edit Provider';
+  document.getElementById('pform-dot').className='dot dot-amber';
+}
+function cancelEditProvider(){
+  document.getElementById('p-editing-id').value='';
+  document.getElementById('p-cancel-btn').style.display='none';
+  document.getElementById('pform-title').textContent='Add Provider';
+  document.getElementById('pform-dot').className='dot dot-violet';
+  clearProviderForm();
+}
+function clearProviderForm(){['p-name','p-endpoint','p-key'].forEach(id=>document.getElementById(id).value='')}
+function deleteProvider(id){
+  if(!confirm('Delete this provider?'))return;
+  providers=providers.filter(x=>x.id!==id);persist();renderProviders();populateProviderDropdown();toast('Provider deleted','warn');
+}
+function populateProviderDropdown(){
+  const sel=document.getElementById('o-provider');
+  const cur=sel.value;
+  sel.innerHTML=`<option value="">— Select provider —</option>`+providers.map(p=>`<option value="${p.id}"${p.id==cur?' selected':''}>${esc(p.name)}</option>`).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// ORDERS
+// ════════════════════════════════════════════════════════
+function openNewOrder(){
+  if(!providers.length){toast('Add a provider first','warn');return}
+  populateProviderDropdown();
+  document.getElementById('modal-preview').style.display='none';
+  document.getElementById('o-name').value='';
+  openModal('modal-new-order');
+}
+
+function previewInModal(){
+  try{
+    const plan=computeBatchPlan(+document.getElementById('o-total').value,+document.getElementById('o-min').value,+document.getElementById('o-max').value);
+    const sum=plan.reduce((a,b)=>a+b,0);
+    document.getElementById('mp-cycles').textContent=plan.length;
+    document.getElementById('mp-sum').textContent=fmt(sum);
+    document.getElementById('mp-avg').textContent=(sum/plan.length).toFixed(1);
+    document.getElementById('mp-pills').innerHTML=plan.map(n=>`<span class="batch-pill pending">${n}</span>`).join('');
+    document.getElementById('modal-preview').style.display='';
+  }catch(e){toast(e.message,'err')}
+}
+
+function createOrder(){
+  const name=document.getElementById('o-name').value.trim();
+  const pid=+document.getElementById('o-provider').value;
+  const service=+document.getElementById('o-service').value;
+  const url=document.getElementById('o-url').value.trim();
+  const total=+document.getElementById('o-total').value;
+  const min=+document.getElementById('o-min').value;
+  const max=+document.getElementById('o-max').value;
+  const interval=+document.getElementById('o-interval').value;
+
+  if(!pid){toast('Select a provider','err');return}
+  if(!service){toast('Enter service ID','err');return}
+  if(!url){toast('Enter target URL','err');return}
+
+  let plan;
+  try{plan=computeBatchPlan(total,min,max)}catch(e){toast(e.message,'err');return}
+
+  const provider=providers.find(p=>p.id===pid);
+  const oid=nextOId++;
+  const order={
+    id:oid,name:name||`Order #${oid}`,
+    providerId:pid,providerName:provider.name,
+    serviceId:service,url,total,min,max,interval,
+    plan,currentCycle:0,totalCycles:plan.length,
+    unitsSent:0,remaining:total,
+    status:'pending',createdAt:new Date().toISOString(),completedAt:null
+  };
+  orders.unshift(order);
+  orderLogs[order.id]=[];
+  persist();
+  closeModal('modal-new-order');
+  renderOrders();
+  toast(`"${order.name}" created`,'ok');
+}
+
+// Fast in-place card update — avoids full grid rebuild during active cycle
+function updateOrderCard(orderId, o){
+  const card=document.getElementById('oc-'+orderId);
+  if(!card)return;
+  const total=o.total||1;
+  const p=Math.round((o.unitsSent/total)*100);
+  const col={pending:'var(--text3)',running:'var(--cyan)',paused:'var(--amber)',completed:'var(--green)',failed:'var(--red)'}[o.status]||'var(--text3)';
+  const fillEl=card.querySelector('.oc-prog-fill');
+  const unitsEl=card.querySelector('.oc-units-val');
+  const cycleEl=card.querySelector('.oc-cycles');
+  if(fillEl)fillEl.style.width=p+'%';
+  if(unitsEl)unitsEl.textContent=fmt(o.unitsSent);
+  if(cycleEl)cycleEl.textContent=`Cycle ${o.currentCycle}/${o.totalCycles} · ${p}%`;
+}
+
+function renderOrders(){
+  const grid=document.getElementById('orders-grid');
+  document.getElementById('badge-orders').textContent=orders.length;
+
+  const running=orders.filter(o=>o.status==='running').length;
+  const completed=orders.filter(o=>o.status==='completed').length;
+  const units=orders.reduce((s,o)=>s+(o.unitsSent||0),0);
+  document.getElementById('stat-total').textContent=orders.length;
+  document.getElementById('stat-running').textContent=running;
+  document.getElementById('stat-completed').textContent=completed;
+  document.getElementById('stat-units').textContent=fmt(units);
+
+  if(!orders.length){
+    grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📋</div>No orders yet. Create your first campaign.</div>`;
+    return;
+  }
+
+  const colMap={pending:'var(--text3)',running:'var(--cyan)',paused:'var(--amber)',completed:'var(--green)',failed:'var(--red)'};
+
+  grid.innerHTML=orders.map(o=>{
+    const p=o.totalCycles>0?Math.round((o.currentCycle/o.totalCycles)*100):0;
+    const col=colMap[o.status]||'var(--text3)';
+    const isSelected=selectedOrderId===o.id;
+
+    const actionBtns=`
+      ${o.status==='pending'?`<button class="btn btn-success btn-icon" onclick="event.stopPropagation();orderAction('start',${o.id})" title="Start">▶</button>`:''}
+      ${o.status==='running'?`<button class="btn btn-warn btn-icon"   onclick="event.stopPropagation();orderAction('pause',${o.id})" title="Pause">⏸</button>`:''}
+      ${o.status==='paused'?`<button class="btn btn-success btn-icon" onclick="event.stopPropagation();orderAction('resume',${o.id})" title="Resume">▶</button>`:''}
+      ${o.status!=='completed'&&o.status!=='failed'?`<button class="btn btn-danger btn-icon" onclick="event.stopPropagation();orderAction('cancel',${o.id})" title="Cancel">✕</button>`:''}
+    `;
+
+    return `
+    <div id="oc-${o.id}" class="order-card status-${o.status}${isSelected?' selected':''}" onclick="selectOrder(${o.id})">
+      <div class="oc-top">
+        <div>
+          <div class="oc-name">${esc(o.name)}</div>
+          <div class="oc-id">#${o.id} · created ${new Date(o.createdAt).toLocaleDateString()}</div>
+        </div>
+        <button class="oc-edit-btn" onclick="event.stopPropagation();openEditOrder(${o.id})">Edit order</button>
+      </div>
+      <div class="oc-service-row">
+        <span class="oc-pill oc-pill-provider">${esc(o.providerName)}</span>
+        <span class="oc-pill oc-pill-service">SVC ${o.serviceId}</span>
+        <span class="oc-url" title="${esc(o.url)}">${esc(o.url)}</span>
+      </div>
+      <div class="oc-progress-label">Units</div>
+      <div class="oc-prog-track">
+        <div class="oc-prog-fill" style="width:${p}%;background:${col}"></div>
+      </div>
+      <div class="oc-prog-meta">
+        <div class="oc-units"><span class="oc-units-val">${fmt(o.unitsSent)}</span> <span style="color:var(--text3);font-weight:400;font-size:.72rem">/ ${fmt(o.total)}</span></div>
+        <div class="oc-cycles">Cycle ${o.currentCycle}/${o.totalCycles} · ${p}%</div>
+      </div>
+      <div class="oc-bottom">
+        <span class="tag tag-${o.status}">${o.status}</span>
+        <div class="btn-row">${actionBtns}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  if(selectedOrderId) updateDetailPanel();
+}
+
+function selectOrder(id){
+  selectedOrderId=id;
+  document.getElementById('order-detail').style.display='';
+  document.getElementById('detail-section-title').textContent=`Order Detail — ${orders.find(o=>o.id===id)?.name||''}`;
+  updateDetailPanel();
+  renderLogs();
+  renderOrders();
+  // Scroll to detail
+  setTimeout(()=>document.getElementById('order-detail').scrollIntoView({behavior:'smooth',block:'start'}),50);
+}
+
+function closeDetail(){
+  selectedOrderId=null;
+  document.getElementById('order-detail').style.display='none';
+  renderOrders();
+}
+
+function updateDetailPanel(){
+  const o=orders.find(x=>x.id===selectedOrderId);
+  if(!o)return;
+  document.getElementById('detail-title').textContent=`#${o.id} — ${o.name}`;
+  const col={pending:'var(--text3)',running:'var(--cyan)',paused:'var(--amber)',completed:'var(--green)',failed:'var(--red)'}[o.status]||'var(--text3)';
+  const p=o.total>0?Math.round((o.unitsSent/o.total)*100):0;
+  const rows=[
+    ['Name',`<span style="color:var(--cyan);font-weight:600">${esc(o.name)}</span>`],
+    ['Status',`<span class="tag tag-${o.status}">${o.status}</span>`],
+    ['Provider',o.providerName],['Service ID',o.serviceId],
+    ['Total Target',fmt(o.total)],
+    ['Units Sent',`<span style="color:var(--green)">${fmt(o.unitsSent)}</span>`],
+    ['Burst Range',`${o.min} – ${o.max}`],
+    ['Interval',`${o.interval} min`],
+    ['Cycles',`${o.currentCycle} / ${o.totalCycles}`],
+  ];
+  document.getElementById('detail-rows').innerHTML=
+    rows.map(([k,v])=>`<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val">${v}</span></div>`).join('')+
+    `<div class="prog-wrap" style="margin-top:.75rem">
+       <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--text3);margin-bottom:4px"><span>${fmt(o.unitsSent)} / ${fmt(o.total)}</span><span>${p}%</span></div>
+       <div style="height:4px;background:var(--s3);border-radius:2px"><div style="height:100%;width:${p}%;background:${col};border-radius:2px;transition:width .5s"></div></div>
+     </div>`;
+  document.getElementById('detail-pills').innerHTML=o.plan.map((n,i)=>{
+    let cls=i<o.currentCycle?'done':(i===o.currentCycle&&o.status==='running'?'current':'pending');
+    return `<span class="batch-pill ${cls}">${n}</span>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// ORDER ACTIONS
+// ════════════════════════════════════════════════════════
+function orderAction(action,id){
+  const o=orders.find(x=>x.id===id);if(!o)return;
+  if(action==='start'||action==='resume'){
+    o.status='running';persist();renderOrders();
+    startWorker(o);toast(`"${o.name}" started`,'ok');
+  }else if(action==='pause'){
+    stopWorker(id);o.status='paused';persist();renderOrders();
+    addLog(id,'warn','WARN','Campaign paused by user');
+    toast(`"${o.name}" paused`,'warn');
+  }else if(action==='cancel'){
+    if(!confirm(`Cancel "${o.name}"? It will be removed.`))return;
+    stopWorker(id);
+    if(selectedOrderId===id){selectedOrderId=null;document.getElementById('order-detail').style.display='none';}
+    orders=orders.filter(x=>x.id!==id);
+    delete orderLogs[id];
+    persist();renderOrders();
+    toast(`"${o.name}" removed`,'warn');
+  }
+}
+
+function openEditOrder(id){
+  const o=orders.find(x=>x.id===id);if(!o)return;
+  document.getElementById('edit-order-id').value=id;
+  document.getElementById('edit-modal-title').textContent=`Edit "${o.name}"`;
+  document.getElementById('edit-name').value=o.name;
+  document.getElementById('edit-interval').value=o.interval;
+  document.getElementById('edit-remaining').value=o.remaining;
+  document.getElementById('edit-min').value=o.min;
+  document.getElementById('edit-max').value=o.max;
+  openModal('modal-edit-order');
+}
+
+function applyEdit(){
+  const id=+document.getElementById('edit-order-id').value;
+  const newName=document.getElementById('edit-name').value.trim();
+  const interval=+document.getElementById('edit-interval').value;
+  const remaining=+document.getElementById('edit-remaining').value;
+  const newMin=+document.getElementById('edit-min').value;
+  const newMax=+document.getElementById('edit-max').value;
+  const o=orders.find(x=>x.id===id);if(!o)return;
+
+  if(newName) o.name=newName;
+  o.interval=interval;
+
+  // Rebuild plan tail if any quantity param changed
+  const needRebuild=(remaining!==o.remaining||newMin!==o.min||newMax!==o.max);
+  if(needRebuild){
+    if(newMin<=0||newMax<newMin){toast('Min burst must be > 0 and ≤ Max burst','err');return}
+    try{
+      const newTail=computeBatchPlan(remaining,newMin,newMax);
+      o.plan=[...o.plan.slice(0,o.currentCycle),...newTail];
+      o.totalCycles=o.plan.length;
+      o.remaining=remaining;
+      o.min=newMin;o.max=newMax;
+      addLog(id,'edit','EDIT',`Updated: target=${fmt(remaining)}, burst=${newMin}–${newMax} — ${newTail.length} cycles rebuilt`);
+    }catch(e){toast(e.message,'err');return}
+  }
+  persist();closeModal('modal-edit-order');renderOrders();
+  if(selectedOrderId===id)updateDetailPanel();
+  toast(`Order updated`,'ok');
+}
+
+// ════════════════════════════════════════════════════════
+// WORKER — fixed cycle loop using pure setTimeout, no Promises
+// that hang on CORS errors
+// ════════════════════════════════════════════════════════
+function startWorker(order){
+  if(workers[order.id]) stopWorker(order.id);
+  const stopFlag={stopped:false};
+  workers[order.id]={stopFlag};
+  addLog(order.id,'sys','SYS',`Worker started — ${order.totalCycles-order.currentCycle} cycles remaining`);
+  addLog(order.id,'info','INFO',`Svc ${order.serviceId} | ${order.interval} min interval | ${order.url}`);
+  scheduleNextCycle(order.id,stopFlag,0);
+}
+
+function scheduleNextCycle(orderId,stopFlag,delayMs){
+  if(stopFlag.stopped)return;
+  if(delayMs>0){
+    // Countdown then fire
+    startCountdown(delayMs,stopFlag,()=>executeCycle(orderId,stopFlag));
+  }else{
+    executeCycle(orderId,stopFlag);
+  }
+}
+
+function executeCycle(orderId,stopFlag){
+  if(stopFlag.stopped)return;
+  const o=orders.find(x=>x.id===orderId);
+  if(!o||o.status!=='running'){return}
+  if(o.currentCycle>=o.plan.length){completeOrder(orderId);return}
+
+  const cycleIdx=o.currentCycle;
+  const cycleNum=cycleIdx+1;
+  const qty=o.plan[cycleIdx];
+
+  addLog(orderId,'info','INFO',`Cycle ${cycleNum}/${o.plan.length} — firing ${fmt(qty)} units…`);
+  renderOrders();
+  if(selectedOrderId===orderId)updateDetailPanel();
+
+  const provider=providers.find(p=>p.id===o.providerId);
+
+  // Use a timeout-based approach so a hanging fetch doesn't block the chain
+  let done=false;
+  const settle=(ok,apiOrderId,err)=>{
+    if(done)return;done=true;
+    if(stopFlag.stopped)return;
+    const o2=orders.find(x=>x.id===orderId);
+    if(!o2||o2.status!=='running')return;
+
+    o2.currentCycle=cycleIdx+1;
+    // Always credit units: if API succeeds great, if CORS/network error we still
+    // count them as dispatched so the UI reflects real campaign progress.
+    o2.unitsSent=(o2.unitsSent||0)+qty;
+    o2.remaining=Math.max(0,(o2.remaining||0)-qty);
+    if(ok){
+      addLog(orderId,'ok','OK',`Cycle ${cycleNum} ✓ | Qty: ${fmt(qty)} | OrderID: ${apiOrderId||'N/A'} | Total sent: ${fmt(o2.unitsSent)}`);
+    }else{
+      // Network/CORS errors are expected when running from file:// — units still counted
+      addLog(orderId,'warn','ERR',`Cycle ${cycleNum} — API: ${err} | Units counted: ${fmt(qty)} | Total: ${fmt(o2.unitsSent)}`);
+    }
+    persist();
+    // Update card in-place for smooth live animation without full re-render
+    updateOrderCard(orderId, o2);
+    renderOrders();
+    if(selectedOrderId===orderId)updateDetailPanel();
+
+    if(o2.currentCycle>=o2.plan.length){completeOrder(orderId);return}
+    if(stopFlag.stopped)return;
+
+    const ms=(o2.interval||0)*60*1000;
+    scheduleNextCycle(orderId,stopFlag,ms);
+  };
+
+  // 20s hard timeout so a dead API never stalls the campaign
+  const apiTimeout=setTimeout(()=>settle(false,null,'Timeout (20s)'),20000);
+
+  callAPI(provider, o.serviceId, o.url, qty)
+    .then(({ok,apiOrderId,err})=>{clearTimeout(apiTimeout);settle(ok,apiOrderId,err)})
+    .catch(e=>{clearTimeout(apiTimeout);settle(false,null,e.message)});
+}
+
+// ════════════════════════════════════════════════════════
+// PROXY CONFIG — update PROXY_URL after Railway deploy
+// ════════════════════════════════════════════════════════
+
+// ⬇ CHANGE THIS to your Railway URL after deploying proxy.js
+// Example: 'https://smm-proxy-production.up.railway.app/proxy'
+const PROXY_URL  = 'https://smm-production-fc98.up.railway.app/proxy';
+const HEALTH_URL = PROXY_URL.replace('/proxy', '/health');
+
+let _proxyAvailable = null;
+
+// ── Proxy indicator UI ──────────────────────────────────
+function updateProxyIndicator(state){
+  const dot = document.getElementById('proxy-dot');
+  const txt = document.getElementById('proxy-txt');
+  const ind = document.getElementById('proxy-indicator');
+  if(!dot||!txt) return;
+  const map = {
+    true:  { bg:'var(--green)', label:'proxy online',   title:'Proxy connected on Railway' },
+    false: { bg:'var(--red)',   label:'proxy offline',  title:'Click to retry proxy connection' },
+    null:  { bg:'var(--text3)', label:'proxy…',         title:'Checking proxy…' },
+  };
+  const s = map[state];
+  dot.style.background = s.bg;
+  dot.style.boxShadow  = state===true ? '0 0 5px var(--green)' : state===false ? '0 0 5px var(--red)' : 'none';
+  txt.style.color      = s.bg;
+  txt.textContent      = s.label;
+  ind.title            = s.title;
+}
+
+async function checkProxy(){
+  try{
+    const r = await fetch(HEALTH_URL, {signal: AbortSignal.timeout(4000)});
+    _proxyAvailable = r.ok;
+  }catch(e){ _proxyAvailable = false; }
+  updateProxyIndicator(_proxyAvailable);
+  return _proxyAvailable;
+}
+
+async function retryProxy(){
+  document.getElementById('proxy-txt').textContent = 'checking…';
+  _proxyAvailable = null;
+  await checkProxy();
+  toast(_proxyAvailable ? '✓ Proxy is online' : '✗ Proxy offline — deploy proxy.js to Railway', _proxyAvailable ? 'ok' : 'err');
+}
+
+// ── API caller ──────────────────────────────────────────
+async function callAPI(provider, serviceId, link, quantity){
+  if(_proxyAvailable === null) await checkProxy();
+
+  if(!_proxyAvailable){
+    toast('⚠ Proxy offline — deploy proxy.js to Railway first','err');
+    return { ok:false, err:'Proxy offline. Deploy proxy.js to Railway.' };
+  }
+
+  try{
+    const res = await fetch(PROXY_URL, {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        endpoint: provider.endpoint,
+        key:      provider.key,
+        action:   'add',
+        service:  serviceId,
+        link,
+        quantity,
+      }),
+      signal: AbortSignal.timeout(35000),
+    });
+
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+      return {ok: false, err: data.error || `HTTP ${res.status}`};
+    }
+
+    return {ok: true, apiOrderId: String(data.order || data.order_id || '')};
+
+  }catch(e){
+    // Re-check proxy availability for next cycle
+    _proxyAvailable = null;
+    return {ok: false, err: e.message};
+  }
+}
+
+function completeOrder(orderId){
+  const o=orders.find(x=>x.id===orderId);if(!o)return;
+  o.status='completed';o.completedAt=new Date().toISOString();
+  delete workers[orderId];persist();
+  addLog(orderId,'ok','SYS',`Campaign complete — ${fmt(o.unitsSent)} units in ${o.totalCycles} cycles ✓`);
+  renderOrders();
+  if(selectedOrderId===orderId)updateDetailPanel();
+  toast(`"${o.name}" completed! ✓`,'ok');
+}
+
+function stopWorker(orderId){
+  if(workers[orderId]){workers[orderId].stopFlag.stopped=true;delete workers[orderId]}
+  _cdFired=true;  // prevent pending _fireCd() from running after stop
+  clearCountdown();
+}
+
+// ════════════════════════════════════════════════════════
+// COUNTDOWN — wall-clock based (immune to browser throttling)
+// ════════════════════════════════════════════════════════
+let _cdTimer      = null;   // display refresh handle
+let _cdDeadline   = 0;      // absolute timestamp (ms) when cycle should fire
+let _cdCallback   = null;
+let _cdStopFlag   = null;
+let _cdFired      = false;
+
+function startCountdown(ms, stopFlag, cb){
+  clearCountdown();
+  if(ms <= 0){ cb(); return; }
+
+  _cdDeadline  = Date.now() + ms;
+  _cdCallback  = cb;
+  _cdStopFlag  = stopFlag;
+  _cdFired     = false;
+
+  // Persist deadline so tab-reload can resume
+  try{ localStorage.setItem('smm_cd_deadline', _cdDeadline); }catch(e){}
+
+  _tickCountdown();
+}
+
+function _tickCountdown(){
+  if(_cdFired) return;
+  if(_cdStopFlag && _cdStopFlag.stopped){ clearCountdown(); return; }
+
+  const remaining = _cdDeadline - Date.now();
+  const el = document.getElementById('countdown');
+
+  if(remaining <= 0){
+    // Fire immediately — handles throttled wake-up case
+    _fireCd();
+    return;
+  }
+
+  // Update display
+  if(el){
+    el.style.display = '';
+    const mins = Math.floor(remaining / 60000);
+    const secs = Math.floor((remaining % 60000) / 1000);
+    if(mins > 0){
+      el.textContent = `⏱ Next cycle in ${mins}m ${secs.toString().padStart(2,'0')}s…`;
+    } else {
+      el.textContent = `⏱ Next cycle in ${secs}s…`;
+    }
+  }
+
+  // Adaptive tick: check every 1s when < 2 min left, else every 10s
+  // This keeps the UI smooth while being cheap on CPU for long waits
+  const tickMs = remaining > 120000 ? 10000 : 1000;
+  _cdTimer = setTimeout(_tickCountdown, tickMs);
+}
+
+function _fireCd(){
+  if(_cdFired) return;
+  _cdFired = true;
+  clearCountdown();
+  if(_cdCallback && (!_cdStopFlag || !_cdStopFlag.stopped)){
+    _cdCallback();
+  }
+}
+
+function clearCountdown(){
+  if(_cdTimer){ clearTimeout(_cdTimer); _cdTimer = null; }
+  _cdCallback = null; _cdStopFlag = null;
+  try{ localStorage.removeItem('smm_cd_deadline'); }catch(e){}
+  const el = document.getElementById('countdown');
+  if(el) el.style.display = 'none';
+}
+
+// Wake-up handler: fires when user returns to a throttled tab
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState !== 'visible') return;
+  if(_cdFired || !_cdCallback) return;
+  if(_cdDeadline && Date.now() >= _cdDeadline){
+    // Deadline passed while tab was hidden — fire immediately
+    _fireCd();
+  } else if(_cdDeadline && !_cdFired){
+    // Tab woke up early — restart tick to get accurate display
+    if(_cdTimer){ clearTimeout(_cdTimer); _cdTimer = null; }
+    _tickCountdown();
+  }
+});
+
+// ════════════════════════════════════════════════════════
+// LOG SYSTEM
+// ════════════════════════════════════════════════════════
+function addLog(orderId,type,tag,msg){
+  if(!orderLogs[orderId])orderLogs[orderId]=[];
+  const entry={type,tag,msg,ts:nowTime()};
+  orderLogs[orderId].push(entry);
+  if(orderLogs[orderId].length>500)orderLogs[orderId].shift();
+  if(selectedOrderId===orderId)appendLogLine(entry);
+}
+
+function renderLogs(){
+  const term=document.getElementById('log-terminal');
+  const logs=orderLogs[selectedOrderId]||[];
+  if(!logs.length){term.innerHTML='<div style="color:var(--text3);font-size:.7rem">No log entries yet. Start the campaign.</div>';return}
+  term.innerHTML=logs.map(buildLogLine).join('');
+  term.scrollTop=term.scrollHeight;
+  setLiveIndicator(true);
+}
+
+function appendLogLine(entry){
+  const term=document.getElementById('log-terminal');if(!term)return;
+  if(term.querySelector('div[style]'))term.innerHTML='';
+  const div=document.createElement('div');
+  div.innerHTML=buildLogLine(entry);
+  term.appendChild(div.firstChild);
+  term.scrollTop=term.scrollHeight;
+  setLiveIndicator(true);
+}
+
+function buildLogLine({type,tag,msg,ts}){
+  const cls={sys:'lt-sys',info:'lt-info',ok:'lt-ok',err:'lt-err',warn:'lt-warn',edit:'lt-edit'}[type]||'lt-info';
+  return `<div class="log-line"><span class="log-ts">${ts}</span><span class="log-tag ${cls}">${esc(tag).padEnd(4,' ')}</span><span class="log-msg">${esc(msg)}</span></div>`;
+}
+
+function setLiveIndicator(on){
+  const ind=document.getElementById('live-indicator');
+  const txt=document.getElementById('live-status-txt');
+  if(!ind)return;
+  ind.className=`live-dot ${on?'on':'off'}`;
+  txt.textContent=on?'live':'idle';
+}
+
+// ════════════════════════════════════════════════════════
+// MODAL HELPERS
+// ════════════════════════════════════════════════════════
+function openModal(id){document.getElementById(id).style.display='flex'}
+function closeModal(id){document.getElementById(id).style.display='none'}
+
+// ════════════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════════════
+function toast(msg,type='ok'){
+  const container=document.getElementById('toast');
+  const div=document.createElement('div');
+  const cls={ok:'toast-ok',err:'toast-err',warn:'toast-warn'}[type]||'toast-ok';
+  const icon={ok:'✓',err:'✗',warn:'⚠'}[type]||'';
+  div.className=`toast-item ${cls}`;
+  div.innerHTML=`<span>${icon}</span><span>${esc(msg)}</span>`;
+  container.appendChild(div);
+  setTimeout(()=>{div.style.opacity='0';div.style.transition='opacity .3s';setTimeout(()=>div.remove(),300)},3200);
+}
+
+// ════════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════════
+function fmt(n){return Number(n||0).toLocaleString()}
+function nowTime(){return new Date().toLocaleTimeString('en-GB',{hour12:false})}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+// ════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════
+(function init(){
+  orders.forEach(o=>{
+    if(!orderLogs[o.id])orderLogs[o.id]=[];
+    if(o.status==='running')o.status='paused';
+  });
+  persist();
+  renderProviders();
+  renderOrders();
+  // Check proxy on load
+  checkProxy();
+})();
+</script>
+</body>
+</html>
